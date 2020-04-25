@@ -1,1 +1,1 @@
-*/10 * * * * /home/pi/workspace/monitoring/update.sh
+*/10 * * * * /home/pi/workspace/plantmon/update.sh

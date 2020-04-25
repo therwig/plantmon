@@ -111,6 +111,7 @@ trend_temp = moving_average(temp,navg)
 trend_mois = moving_average(mois,navg)
 # print(len(trend_temp), len(temp))
 
+PlotLast(31*24*60*60, time, temp, tempe, mois, moise, trend_temp, trend_mois, "1mo", "Past month")
 PlotLast(7*24*60*60, time, temp, tempe, mois, moise, trend_temp, trend_mois, "1wk", "Past week")
 PlotLast(3*24*60*60, time, temp, tempe, mois, moise, trend_temp, trend_mois, "3day", "Past 3 days")
 PlotLast(24*60*60, time, temp, tempe, mois, moise, trend_temp, trend_mois, "24hr", "Past 24 hours")
