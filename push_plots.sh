@@ -1,21 +1,31 @@
-# stage plots
-cp plots/6hr_mois.png  html/
-cp plots/6hr_temp.png  html/
-cp plots/24hr_mois.png html/
-cp plots/24hr_temp.png html/
-cp plots/3day_mois.png html/
-cp plots/3day_temp.png html/
-cp plots/1wk_mois.png  html/
-cp plots/1wk_temp.png  html/
-cp plots/1mo_mois.png  html/
-cp plots/1mo_temp.png  html/
+# clean staging area
+rm -r html/*
 
-# edit time info
-cp util/index_template.html  html/index.html
-sed -i "s/TEMPLATE1/`cat plots/6hr.txt`/g" html/index.html
-sed -i "s/TEMPLATE2/`cat plots/24hr.txt`/g" html/index.html
-sed -i "s/TEMPLATE3/`cat plots/3day.txt`/g" html/index.html
-sed -i "s/TEMPLATE4/`cat plots/1wk.txt`/g" html/index.html
-sed -i "s/TEMPLATE5/`cat plots/1mo.txt`/g" html/index.html
-sed -i "s/TIMESTAMP/`date`/g" html/index.html
-sudo cp html/* /var/www/html/
+# cp main index
+cp util/index.html  html/
+
+# types of plot to show
+for what in main average template
+do
+    # make subdir and index html
+    mkdir -p html/${what}/
+    cp util/main_template.html  html/${what}/${what}.html
+
+    # update templates
+    sed -i "s/TEMPLATE1/`cat plots/${what}/6hr.txt`/g"  html/${what}/${what}.html
+    sed -i "s/TEMPLATE2/`cat plots/${what}/24hr.txt`/g" html/${what}/${what}.html
+    sed -i "s/TEMPLATE3/`cat plots/${what}/3day.txt`/g" html/${what}/${what}.html
+    sed -i "s/TEMPLATE4/`cat plots/${what}/1wk.txt`/g"  html/${what}/${what}.html
+    sed -i "s/TEMPLATE5/`cat plots/${what}/1mo.txt`/g"  html/${what}/${what}.html
+    sed -i "s/TIMESTAMP/`date`/g" html/${what}/${what}.html
+    
+    # stage plots
+    for time in 6hr 24hr 3day 1wk 1mo
+    do
+        cp plots/main/${time}_mois.png  html/main/plots/
+        cp plots/main/${time}_temp.png  html/main/plots/
+    done
+
+done
+
+sudo cp -r html/* /var/www/html/
