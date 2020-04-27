@@ -20,10 +20,11 @@ do
     sed -i "s/TIMESTAMP/`date`/g" html/${what}/${what}.html
     
     # stage plots
+    mkdir -p html/${what}/plots/
     for time in 6hr 24hr 3day 1wk 1mo
     do
-        cp plots/main/${time}_mois.png  html/main/plots/
-        cp plots/main/${time}_temp.png  html/main/plots/
+        cp plots/main/${time}_mois.png  html/${what}/plots/
+        cp plots/main/${time}_temp.png  html/${what}/plots/
     done
 
 done

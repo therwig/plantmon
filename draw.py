@@ -6,16 +6,19 @@ import numpy as np
 import os
 from time import strftime, localtime
 
-def plot(x, y, ye, avg, name, text='', xtitle='time', ytitle=''):
+def plot(x, _y, _avg, name, text='', xtitle='time', ytitle='', odir='plots/'):
+    y, ye = _y[0], _y[1]
+    avg, avge = _avg[0], _avg[1]
+    
     plt.figure(figsize=(6,4))
     plt.errorbar(x=x, y=y, yerr=ye)
-    #plt.errorbar(x=x, y=avg, yerr=np.zeros_like(avg))
+    plt.errorbar(x=x, y=avg, yerr=avge)
     ax = plt.gca()
     plt.text(0.1, 0.9, text, transform=ax.transAxes)
     plt.xlabel(xtitle)
     plt.ylabel(ytitle)
     # plt.locator_params(axis='x', nbins=4)
-    plt.savefig("plots/"+name+".png")
+    plt.savefig(odir+"/"+name+".png")
     plt.close()
     return
 
@@ -33,39 +36,50 @@ def rebinToN(y, ye, N):
 def rebinTimeToN(t, N):
     return rebinTime(t, int(len(t)/N))
 
-def moving_average(a, n=3) :
-    x=a.copy()
-    c = np.cumsum(a, dtype=float)
-    for i in range(len(a)):
-        x[i] = (c[i]-c[max(i-n,0)])/min(n,i+1)
-    x[0]=a[0]
-    for i in range(n):
-        x[i]=a[:i].sum()/(i+1)
-        
-    return x
+def moving_average(x,d=5):
+    a=[]
+    for i in range(len(x)):
+        if i<d:
+            a.append( sum(x[0:i+1]) / (i+1.) )
+        else:
+            a.append( sum(x[i-d+1:i+1]) / d )
+    return a
 
-def PlotLast(interval, _time, _temp, _tempe, _mois, _moise,
-             _trend_temp, _trend_mois, prefix, label, nbins=-1):
+def get_avg(_x,d=5):
+    e=max(1,int(d/2))
+    x=_x[0].copy()
+    x = np.insert(x,0,[x[0]]*e)
+    x = np.append(x,[x[-1]]*e)
+    a=[]
+    for i in range(len(_x[0])):
+        a.append( x[i:i+2*e+1].sum()/(2*e+1) )
+
+    return np.vstack( [np.array(a),np.zeros_like(a)] )
+
+#    PlotLast(seconds, time, temp, mois, avg_temp, avg_mois, sname, lname, odir)
+def PlotLast(interval_sec, _time, _temp, _mois,
+             _avg_temp, _avg_mois, prefix, label, odir,
+             nbins=-1):
     latest = _time[-1]
     istart=0
-    while(latest-_time[istart] > interval): istart += 1
+    while(latest-_time[istart] > interval_sec): istart += 1
     time = _time [istart:]
-    temp = _temp [istart:]
-    tempe= _tempe[istart:]
-    mois = _mois [istart:]
-    moise= _moise[istart:]
-    trend_temp = _trend_temp [istart:]
-    trend_mois = _trend_mois [istart:]
+    temp = _temp [:,istart:]
+    mois = _mois [:,istart:]
+    avg_temp = _avg_temp [:,istart:]
+    avg_mois = _avg_mois [:,istart:]
 
     if nbins>0:
         time = rebinTimeToN(time, nbins)
-        temp, tempe = rebinToN(temp, tempe, nbins)
-        mois, moise = rebinToN(mois, moise, nbins)
+        # temp, tempe = rebinToN(temp, tempe, nbins)
+        # mois, moise = rebinToN(mois, moise, nbins)
+        temp = np.vstack( rebinToN(temp[0], tempe[1], nbins) )
+        mois = np.vstack( rebinToN(mois[0], moise[1], nbins) )
     time = (np.array(time) - time[-1]) / 60 # minutes from last data
     
-    if interval < 2*60*60:
+    if interval_sec < 2*60*60:
         xtitle = "time (minutes)"
-    elif interval < 2*24*60*60:
+    elif interval_sec < 2*24*60*60:
         xtitle = "time (hours)"
         time /= 60
     else:
@@ -74,9 +88,9 @@ def PlotLast(interval, _time, _temp, _tempe, _mois, _moise,
 
     #latest_str = strftime("%Y-%m-%d %H:%M:%S", localtime(latest))
     latest_str = strftime("%H:%M:%S on %a %b %d, %Y", localtime(latest))
-    os.system( 'echo "{}" > plots/{}.txt'.format(latest_str, prefix) )
-    plot(time, temp, tempe, trend_temp, prefix+"_temp", xtitle=xtitle, ytitle="Temperature [deg F]", text=label)
-    plot(time, mois, moise, trend_mois, prefix+"_mois", xtitle=xtitle, ytitle="Moisture content", text=label)
+    os.system( 'echo "{}" > {}/{}.txt'.format(latest_str, odir, prefix) )
+    plot(time, temp, avg_temp, prefix+"_temp", xtitle = xtitle, ytitle="Temperature [deg F]", text=label, odir=odir)
+    plot(time, mois, avg_mois, prefix+"_mois", xtitle = xtitle, ytitle="Moisture content", text=label, odir=odir)
 
 def getData(fname):        
     with open(fname,'r') as f:
@@ -96,26 +110,40 @@ def getData(fname):
         tempe[i] = tempe[i]/np.sqrt(nsamp[i])
         moise[i] = moise[i]/np.sqrt(nsamp[i])
 
-    # unit is unix time "time.time()"
-    # time = [localtime(t) for t in time]
-    # # time.localtime()        
-    # print( 'first times:', time[:3])
-    # print( 'last times:', time[-3:])
-    # exit(0)
-    return time, nsamp, temp, tempe, mois, moise
+    temp = np.vstack( [temp, tempe] )
+    mois = np.vstack( [mois, moise] )
+        
+    return time, temp, mois, nsamp
 
-time, nsamp, temp, tempe, mois, moise = getData('data/log.txt')
+#
+# Get data
+
+time, temp, mois, nsamp = getData('data/log.txt')
 
 navg=5
-trend_temp = moving_average(temp,navg)
-trend_mois = moving_average(mois,navg)
-# print(len(trend_temp), len(temp))
+avg_temp = get_avg(temp,navg)
+avg_mois = get_avg(mois,navg)
 
-PlotLast(31*24*60*60, time, temp, tempe, mois, moise, trend_temp, trend_mois, "1mo", "Past month")
-PlotLast(7*24*60*60, time, temp, tempe, mois, moise, trend_temp, trend_mois, "1wk", "Past week")
-PlotLast(3*24*60*60, time, temp, tempe, mois, moise, trend_temp, trend_mois, "3day", "Past 3 days")
-PlotLast(24*60*60, time, temp, tempe, mois, moise, trend_temp, trend_mois, "24hr", "Past 24 hours")
-PlotLast( 6*60*60, time, temp, tempe, mois, moise, trend_temp, trend_mois, "6hr", "Past 6 hours")
+timespans = [
+    (31*24*60*60, "1mo", "Past month"),
+    (7*24*60*60,  "1wk", "Past week"),
+    (3*24*60*60,  "3day", "Past 3 days"),
+    (24*60*60,    "24hr", "Past 24 hours"),
+    ( 6*60*60,    "6hr", "Past 6 hours"),
+]
+
+#exit(0)
+subdirs=['main','average','template']
+for s in subdirs:
+    odir="plots/"+s
+    for seconds, sname, lname in timespans:
+        PlotLast(seconds, time, temp, mois, avg_temp, avg_mois, sname, lname, odir)
+
+# PlotLast(31*24*60*60, time, temp, tempe, mois, moise, trend_temp, trend_mois, "1mo", "Past month")
+# PlotLast(7*24*60*60, time, temp, tempe, mois, moise, trend_temp, trend_mois, "1wk", "Past week")
+# PlotLast(3*24*60*60, time, temp, tempe, mois, moise, trend_temp, trend_mois, "3day", "Past 3 days")
+# PlotLast(24*60*60, time, temp, tempe, mois, moise, trend_temp, trend_mois, "24hr", "Past 24 hours")
+# PlotLast( 6*60*60, time, temp, tempe, mois, moise, trend_temp, trend_mois, "6hr", "Past 6 hours")
 
 # N=60
 # time = rebinTimeToN(time , N)
